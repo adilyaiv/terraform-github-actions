@@ -1,39 +1,66 @@
-name: 'Terraform GitHub Actions'
-description: 'Runs Terraform commands via GitHub Actions.'
-author: 'HashiCorp, Inc. Terraform Team <terraform@hashicorp.com>'
-branding:
-  icon: 'terminal'
-  color: 'purple'
-inputs:
-  tf_actions_subcommand:
-    description: 'Terraform subcommand to execute.'
-    required: true
-  tf_actions_version:
-    description: 'Terraform version to install.'
-    required: true
-  tf_actions_cli_credentials_hostname:
-    description: 'Hostname for the CLI credentials file.'
-    default: 'app.terraform.io'
-  tf_actions_cli_credentials_token:
-    description: 'Token for the CLI credentials file.'
-  tf_actions_comment:
-    description: 'Whether or not to comment on pull requests.'
-    default: true
-  tf_actions_working_dir:
-    description: 'Terraform working directory.'
-    default: '.'
-  tf_actions_fmt_write:
-    description: 'Write Terraform fmt changes to source files.'
-    default: false
-outputs:
-  tf_actions_output:
-    description: 'The Terraform outputs in JSON format.'
-  tf_actions_plan_has_changes:
-    description: 'Whether or not the Terraform plan contained changes.'
-  tf_actions_plan_output:
-    description: 'The Terraform plan output.'
-  tf_actions_fmt_written:
-    description: 'Whether or not the Terraform formatting was written to source files.'
-runs:
-  using: 'docker'
-  image: './Dockerfile'
+name: 'Terraform'
+ 
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+ 
+jobs:
+  terraform:
+    name: 'Terraform'
+    env:
+      ARM_CLIENT_ID: ${{ secrets.AZURE_AD_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.AZURE_AD_CLIENT_SECRET }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
+      ARM_USERNAME: ${{ secrets.AZURE_AD_USERNAME }}
+      ARM_PASSWORD: ${{ secrets.AZURE_AD_PASSWORD }}
+    runs-on: ubuntu-latest
+    environment: production
+ 
+    # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+ 
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Checkout
+      uses: actions/checkout@v2
+ 
+    - name: 'Terraform Format'
+      uses: hashicorp/terraform-github-actions@master
+      with:
+        tf_actions_version: 0.14.8
+        tf_actions_subcommand: 'fmt'
+        tf_actions_working_dir: "./terraform"
+         
+    - name: 'Terraform Init'
+      uses: hashicorp/terraform-github-actions@master
+      with:
+        tf_actions_version: 0.14.8
+        tf_actions_subcommand: 'init'
+        tf_actions_working_dir: "./terraform"
+ 
+    - name: 'Terraform Validate'
+      uses: hashicorp/terraform-github-actions@master
+      with:
+        tf_actions_version: 0.14.8
+        tf_actions_subcommand: 'validate'
+        tf_actions_working_dir: "./terraform"
+         
+    - name: 'Terraform Plan'
+      uses: hashicorp/terraform-github-actions@master
+      with:
+        tf_actions_version: 0.14.8
+        tf_actions_subcommand: 'plan'
+        tf_actions_working_dir: "./terraform"
+ 
+    - name: Terraform Apply
+      if: github.ref == 'refs/heads/main'
+      uses: hashicorp/terraform-github-actions@master
+      with:
+        tf_actions_version: 0.14.8
+        tf_actions_subcommand: 'apply'
+        tf_actions_working_dir: "./terraform"
